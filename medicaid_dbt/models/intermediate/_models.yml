@@ -1,0 +1,15 @@
+version: 2
+
+models:
+  - name: int_claims_with_state
+    description: "Claims joined to provider state via billing NPI. Left join preserves all claims; ~5-15% may have null state for unmatched NPIs."
+    columns:
+      - name: billing_npi
+        data_tests:
+          - not_null
+      - name: hcpcs_code
+        data_tests:
+          - not_null
+      - name: claim_month
+        data_tests:
+          - not_null

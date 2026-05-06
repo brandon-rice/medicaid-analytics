@@ -1,0 +1,45 @@
+version: 2
+
+models:
+  - name: mart_spend_by_state_month
+    description: "Total Medicaid outpatient/professional spend by state and month. Drives the time-series chart in the dashboard."
+    columns:
+      - name: practice_state
+        data_tests:
+          - not_null
+      - name: claim_month
+        data_tests:
+          - not_null
+
+  - name: mart_top_providers_yoy
+    description: "Top providers by spend per state-year and nationally. Includes only top-50 in either ranking."
+    columns:
+      - name: billing_npi
+        data_tests:
+          - not_null
+      - name: claim_year
+        data_tests:
+          - not_null
+
+  - name: mart_top_hcpcs_by_year
+    description: "Top HCPCS codes by spend, claim count, and beneficiary count. Includes both state-level and national rows."
+    columns:
+      - name: hcpcs_code
+        data_tests:
+          - not_null
+      - name: claim_year
+        data_tests:
+          - not_null
+
+  - name: mart_cost_per_bene_hcpcs_yoy
+    description: |
+      Cost per beneficiary by HCPCS-state-year, with YOY %, cumulative %, CAGR, and regression-based 
+      trend metrics. Filtered to combinations with >=100 beneficiaries to reduce noise. Trend metrics 
+      are null for state-HCPCS-years where cost-per-beneficiary is non-positive in either endpoint.
+    columns:
+      - name: hcpcs_code
+        data_tests:
+          - not_null
+      - name: claim_year
+        data_tests:
+          - not_null

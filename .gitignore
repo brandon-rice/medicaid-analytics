@@ -1,0 +1,6 @@
+.venv/
+.env
+*.parquet
+*.csv
+__pycache__/
+.dbt/

@@ -1,0 +1,109 @@
+[0m12:01:33.068118 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001C6C5DF7350>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001C6C6B810D0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001C6C5EA15B0>]}
+
+
+============================== 12:01:33.074108 | ee1313aa-0a0b-400e-9dcd-577a4d009d02 ==============================
+[0m12:01:33.074108 [info ] [MainThread]: Running with dbt=1.11.8
+[0m12:01:33.075113 [debug] [MainThread]: running dbt with arguments {'static_parser': 'True', 'no_print': 'None', 'version_check': 'True', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'target_path': 'None', 'printer_width': '80', 'write_json': 'True', 'introspect': 'True', 'log_cache_events': 'False', 'empty': 'None', 'cache_selected_only': 'False', 'log_format': 'default', 'debug': 'False', 'fail_fast': 'False', 'profiles_dir': 'C:\\Users\\brand\\.dbt', 'send_anonymous_usage_stats': 'True', 'quiet': 'False', 'warn_error': 'None', 'partial_parse': 'True', 'invocation_command': 'dbt init medicaid_dbt', 'use_colors': 'True', 'indirect_selection': 'eager', 'use_experimental_parser': 'False', 'log_path': 'logs'}
+[0m12:01:33.105672 [debug] [MainThread]: Starter project path: C:\Users\brand\OneDrive\Documents\git\medicaid-analytics\.venv\Lib\site-packages\dbt\include\starter_project
+[0m12:01:33.133439 [info ] [MainThread]: 
+Your new dbt project "medicaid_dbt" was created!
+
+For more information on how to configure the profiles.yml file,
+please consult the dbt documentation here:
+
+  https://docs.getdbt.com/docs/configure-your-profile
+
+One more thing:
+
+Need help? Don't hesitate to reach out to us via GitHub issues or on Slack:
+
+  https://community.getdbt.com/
+
+Happy modeling!
+
+[0m12:01:33.134440 [info ] [MainThread]: Setting up your profile.
+[0m12:10:14.230814 [info ] [MainThread]: Profile medicaid_dbt written to C:\Users\brand\.dbt\profiles.yml using target's profile_template.yml and your supplied values. Run 'dbt debug' to validate the connection.
+[0m12:10:14.231815 [debug] [MainThread]: Command `dbt init` succeeded at 12:10:14.231815 after 521.26 seconds
+[0m12:10:14.231815 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001C6C2DF3CB0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001C6C7D32A20>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001C6C7C63800>]}
+[0m12:10:14.232815 [debug] [MainThread]: Flushing usage events
+[0m12:10:25.305040 [debug] [MainThread]: An error was encountered while trying to flush usage events
+[0m12:10:55.313038 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000275A8C96B10>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000275ABCBF6E0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000275AB2F0830>]}
+
+
+============================== 12:10:55.317037 | d7532c36-f767-4a25-8553-917f0231583c ==============================
+[0m12:10:55.317037 [info ] [MainThread]: Running with dbt=1.11.8
+[0m12:10:55.318037 [debug] [MainThread]: running dbt with arguments {'version_check': 'True', 'no_print': 'None', 'static_parser': 'True', 'target_path': 'None', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'printer_width': '80', 'write_json': 'True', 'empty': 'None', 'log_cache_events': 'False', 'introspect': 'True', 'cache_selected_only': 'False', 'fail_fast': 'False', 'debug': 'False', 'log_format': 'default', 'profiles_dir': 'C:\\Users\\brand\\.dbt', 'send_anonymous_usage_stats': 'True', 'quiet': 'False', 'warn_error': 'None', 'partial_parse': 'True', 'indirect_selection': 'eager', 'use_colors': 'True', 'invocation_command': 'dbt debug', 'use_experimental_parser': 'False', 'log_path': 'logs'}
+[0m12:10:55.342039 [info ] [MainThread]: dbt version: 1.11.8
+[0m12:10:55.343039 [info ] [MainThread]: python version: 3.12.0
+[0m12:10:55.343039 [info ] [MainThread]: python path: C:\Users\brand\OneDrive\Documents\git\medicaid-analytics\.venv\Scripts\python.exe
+[0m12:10:55.344039 [info ] [MainThread]: os info: Windows-11-10.0.26200-SP0
+[0m12:10:55.388554 [info ] [MainThread]: Using profiles dir at C:\Users\brand\.dbt
+[0m12:10:55.389556 [info ] [MainThread]: Using profiles.yml file at C:\Users\brand\.dbt\profiles.yml
+[0m12:10:55.389556 [info ] [MainThread]: Using dbt_project.yml file at C:\Users\brand\OneDrive\Documents\git\medicaid-analytics\dbt_project.yml
+[0m12:10:55.390557 [error] [MainThread]: Encountered an error:
+Internal Error
+  Profile should not be None if loading profile completed
+[0m12:10:55.391556 [debug] [MainThread]: Command `dbt debug` failed at 12:10:55.391556 after 0.17 seconds
+[0m12:10:55.391556 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000275AB4B6480>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000275AAA23410>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000275AAE9AB70>]}
+[0m12:10:55.392556 [debug] [MainThread]: Flushing usage events
+[0m12:11:01.064589 [debug] [MainThread]: An error was encountered while trying to flush usage events
+[0m14:27:45.205661 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000002966A84A5A0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000002966A849AC0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000002966A84BA40>]}
+
+
+============================== 14:27:45.211069 | 5a2a8f65-d981-472c-8b53-231e8711e1bc ==============================
+[0m14:27:45.211069 [info ] [MainThread]: Running with dbt=1.11.8
+[0m14:27:45.212069 [debug] [MainThread]: running dbt with arguments {'static_parser': 'True', 'no_print': 'None', 'version_check': 'True', 'target_path': 'None', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'printer_width': '80', 'write_json': 'True', 'empty': 'False', 'log_cache_events': 'False', 'introspect': 'True', 'cache_selected_only': 'False', 'log_format': 'default', 'debug': 'False', 'fail_fast': 'False', 'partial_parse': 'True', 'send_anonymous_usage_stats': 'True', 'quiet': 'False', 'warn_error': 'None', 'profiles_dir': 'C:\\Users\\brand\\.dbt', 'use_colors': 'True', 'invocation_command': 'dbt run --select stg_providers', 'indirect_selection': 'eager', 'use_experimental_parser': 'False', 'log_path': 'logs'}
+[0m14:27:45.213070 [error] [MainThread]: Encountered an error:
+Runtime Error
+  No dbt_project.yml found at expected path C:\Users\brand\OneDrive\Documents\git\medicaid-analytics\dbt_project.yml
+  Verify that each entry within packages.yml (and their transitive dependencies) contains a file named dbt_project.yml
+  
+[0m14:27:45.214071 [debug] [MainThread]: Command `dbt run` failed at 14:27:45.214071 after 0.10 seconds
+[0m14:27:45.214071 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000296670C3EC0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000002966A1973B0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000002966AB211C0>]}
+[0m14:27:45.215070 [debug] [MainThread]: Flushing usage events
+[0m14:27:45.555516 [debug] [MainThread]: An error was encountered while trying to flush usage events
+[0m14:30:52.200487 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001CBE24239B0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001CBE61537D0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001CBE61519D0>]}
+
+
+============================== 14:30:52.204033 | d71208cc-38de-4f88-ba0e-3f81a9243bed ==============================
+[0m14:30:52.204033 [info ] [MainThread]: Running with dbt=1.11.8
+[0m14:30:52.205031 [debug] [MainThread]: running dbt with arguments {'version_check': 'True', 'no_print': 'None', 'static_parser': 'True', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'target_path': 'None', 'printer_width': '80', 'write_json': 'True', 'introspect': 'True', 'log_cache_events': 'False', 'empty': 'False', 'cache_selected_only': 'False', 'fail_fast': 'False', 'debug': 'False', 'log_format': 'default', 'partial_parse': 'True', 'send_anonymous_usage_stats': 'True', 'quiet': 'False', 'warn_error': 'None', 'profiles_dir': 'C:\\Users\\brand\\.dbt', 'invocation_command': 'dbt run --select stg_providers', 'use_colors': 'True', 'indirect_selection': 'eager', 'use_experimental_parser': 'False', 'log_path': 'logs'}
+[0m14:30:52.206031 [error] [MainThread]: Encountered an error:
+Runtime Error
+  No dbt_project.yml found at expected path C:\Users\brand\OneDrive\Documents\git\medicaid-analytics\dbt_project.yml
+  Verify that each entry within packages.yml (and their transitive dependencies) contains a file named dbt_project.yml
+  
+[0m14:30:52.207031 [debug] [MainThread]: Command `dbt run` failed at 14:30:52.207031 after 0.09 seconds
+[0m14:30:52.207031 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001CBE5B20830>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001CBE5D70E30>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001CBE61519D0>]}
+[0m14:30:52.208030 [debug] [MainThread]: Flushing usage events
+[0m14:30:52.543878 [debug] [MainThread]: An error was encountered while trying to flush usage events
+[0m14:38:39.511910 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000181050279E0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001810266FC80>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001810368C2F0>]}
+
+
+============================== 14:38:39.514908 | 4936ec3e-48ac-422a-a152-d04ce87b569d ==============================
+[0m14:38:39.514908 [info ] [MainThread]: Running with dbt=1.11.8
+[0m14:38:39.515909 [debug] [MainThread]: running dbt with arguments {'version_check': 'True', 'no_print': 'None', 'static_parser': 'True', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'target_path': 'None', 'printer_width': '80', 'write_json': 'True', 'introspect': 'True', 'log_cache_events': 'False', 'empty': 'False', 'cache_selected_only': 'False', 'fail_fast': 'False', 'debug': 'False', 'log_format': 'default', 'profiles_dir': 'C:\\Users\\brand\\.dbt', 'send_anonymous_usage_stats': 'True', 'quiet': 'False', 'warn_error': 'None', 'partial_parse': 'True', 'indirect_selection': 'eager', 'invocation_command': 'dbt run --select stg_providers', 'use_colors': 'True', 'use_experimental_parser': 'False', 'log_path': 'logs'}
+[0m14:38:39.516909 [error] [MainThread]: Encountered an error:
+Runtime Error
+  No dbt_project.yml found at expected path C:\Users\brand\OneDrive\Documents\git\medicaid-analytics\dbt_project.yml
+  Verify that each entry within packages.yml (and their transitive dependencies) contains a file named dbt_project.yml
+  
+[0m14:38:39.517910 [debug] [MainThread]: Command `dbt run` failed at 14:38:39.517910 after 0.09 seconds
+[0m14:38:39.518910 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000018105D6D370>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000181050279E0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000181056350D0>]}
+[0m14:38:39.518910 [debug] [MainThread]: Flushing usage events
+[0m14:38:39.815604 [debug] [MainThread]: An error was encountered while trying to flush usage events
+[0m10:27:50.103123 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000021E9D75A960>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000021E9ABB3B90>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000021E9A6A5FD0>]}
+
+
+============================== 10:27:50.107126 | b60e0dfa-0536-4fd4-8c4a-a30c008a8b5f ==============================
+[0m10:27:50.107126 [info ] [MainThread]: Running with dbt=1.11.8
+[0m10:27:50.108128 [debug] [MainThread]: running dbt with arguments {'static_parser': 'True', 'no_print': 'None', 'version_check': 'True', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'target_path': 'None', 'printer_width': '80', 'write_json': 'True', 'empty': 'None', 'log_cache_events': 'False', 'introspect': 'True', 'cache_selected_only': 'False', 'fail_fast': 'False', 'debug': 'False', 'log_format': 'default', 'profiles_dir': 'C:\\Users\\brand\\.dbt', 'send_anonymous_usage_stats': 'True', 'quiet': 'False', 'warn_error': 'None', 'partial_parse': 'True', 'invocation_command': 'dbt test', 'indirect_selection': 'eager', 'use_colors': 'True', 'use_experimental_parser': 'False', 'log_path': 'logs'}
+[0m10:27:50.108128 [error] [MainThread]: Encountered an error:
+Runtime Error
+  No dbt_project.yml found at expected path C:\Users\brand\OneDrive\Documents\git\medicaid-analytics\dbt_project.yml
+  Verify that each entry within packages.yml (and their transitive dependencies) contains a file named dbt_project.yml
+  
+[0m10:27:50.110129 [debug] [MainThread]: Command `dbt test` failed at 10:27:50.109127 after 0.10 seconds
+[0m10:27:50.110129 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000021E9E29B0E0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000021E9B9D4560>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000021E9E8E0E30>]}
+[0m10:27:50.111127 [debug] [MainThread]: Flushing usage events
+[0m10:27:50.430530 [debug] [MainThread]: An error was encountered while trying to flush usage events

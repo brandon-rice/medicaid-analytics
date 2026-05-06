@@ -1,0 +1,40 @@
+version: 2
+
+models:
+  - name: stg_claims
+    description: "Cleaned Medicaid outpatient/professional claims at provider-HCPCS-month grain. Source: HHS Medicaid Provider Spending dataset, 2018-2024."
+    columns:
+      - name: billing_npi
+        description: "10-digit NPI of the billing provider."
+        data_tests:
+          - not_null
+      - name: hcpcs_code
+        description: "HCPCS Level I (CPT) or Level II procedure code."
+        data_tests:
+          - not_null
+      - name: claim_month
+        description: "First day of the claim month (cast from YYYY-MM string)."
+        data_tests:
+          - not_null
+      - name: total_paid
+        description: "Sum of paid amounts. Can be negative due to claim reversals/adjustments."
+      - name: unique_beneficiaries
+        description: "Distinct beneficiaries served by this provider for this HCPCS in this month. Suppressed if claim count < 12."
+
+  - name: stg_providers
+    description: "Active healthcare providers from NPPES, joined-ready by NPI."
+    columns:
+      - name: npi
+        description: "10-digit National Provider Identifier."
+        data_tests:
+          - not_null
+          - unique
+      - name: practice_state
+        description: "Two-letter state code from NPPES business practice address."
+        data_tests:
+          - not_null
+      - name: entity_type_code
+        description: "1 = individual provider, 2 = organization."
+        data_tests:
+          - accepted_values:
+              values: ['1', '2']

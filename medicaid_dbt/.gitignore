@@ -1,0 +1,38 @@
+
+target/
+dbt_packages/
+logs/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Environment
+.env
+*.env.local
+
+# dbt
+medicaid_dbt/target/
+medicaid_dbt/dbt_packages/
+medicaid_dbt/logs/
+medicaid_dbt/.user.yml
+
+# Data files (too big for git)
+*.parquet
+*.csv
+data/
+*.zip
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# dbt logs
+logs/
