@@ -40,6 +40,17 @@ st.markdown(
       h2 { font-size: 1.7rem !important; }
       h3 { font-size: 1.3rem !important; }
       .stDataFrame { font-size: 1.02rem; }
+      /* Right-justify all dataframe cells and column headers */
+      .stDataFrame [data-testid="stTable"] td,
+      .stDataFrame [data-testid="stTable"] th,
+      div[data-testid="stDataFrame"] [role="gridcell"],
+      div[data-testid="stDataFrame"] [role="columnheader"] {
+          text-align: right !important;
+          justify-content: flex-end !important;
+      }
+      div[data-testid="stDataFrame"] [role="columnheader"] > div {
+          justify-content: flex-end !important;
+      }
       label, .stSelectbox label, .stTextInput label, .stSlider label {
           font-size: 1.05rem !important; font-weight: 600;
       }
@@ -55,11 +66,18 @@ PALETTES = {
     "provider_trend": "#0a9396",        # teal
     "hcpcs_trend": "#ca6702",           # amber
     "yoy_increase": "Tealgrn",          # plotly sequential
-    "scatter": "Viridis",               # plotly sequential
+    "scatter": "Plasma_r",              # reversed: dark at high end, visible on white
 }
 
 DEFAULT_NPI = "1689744450"
 DEFAULT_HCPCS = "T1019"
+
+
+def fmt_millions(value: float) -> str:
+    """Format a dollar amount in millions, e.g. 1234567 -> '$1.23M'."""
+    if value is None or value != value:  # None or NaN
+        return "—"
+    return f"${value / 1_000_000:,.2f}M"
 
 # Canonical 50 states + DC. Used to scrub territory codes / junk from the
 # state dropdowns.
@@ -171,46 +189,65 @@ if df.empty:
     st.info("No providers found for that selection.")
 else:
     # Bar chart: top 15 by spend
-    top15 = df.nsmallest(15, "rank").sort_values("total_paid")
+    # Collapse to one row per provider (an NPI can have >1 taxonomy row in NPPES,
+    # which would otherwise plot as two bars on the same line). Sum across taxonomy.
+    agg = (
+        df.groupby(["provider_name"], as_index=False)
+        .agg(total_paid=("total_paid", "sum"), rank=("rank", "min"))
+    )
+    top15 = agg.nsmallest(15, "rank").sort_values("total_paid")
     bar = px.bar(
         top15, x="total_paid", y="provider_name", orientation="h",
-        labels={"total_paid": "Total Paid ($)", "provider_name": ""},
+        labels={"total_paid": "Total Paid", "provider_name": ""},
     )
-    bar.update_traces(marker_color=PALETTES["provider_bar"],
-                      hovertemplate="%{y}<br>$%{x:,.0f}<extra></extra>")
+    bar.update_traces(
+        marker_color=PALETTES["provider_bar"],
+        text=top15["total_paid"].map(fmt_millions),
+        textposition="outside", cliponaxis=False,
+        textfont=dict(size=13),
+        hovertemplate="%{y}<br>%{customdata}<extra></extra>",
+        customdata=top15["total_paid"].map(fmt_millions),
+    )
     bar.update_layout(
-        height=520, margin=dict(l=10, r=10, t=20, b=10),
+        height=520, margin=dict(l=10, r=120, t=20, b=10),
         plot_bgcolor="rgba(0,0,0,0)", font=dict(size=14),
+        xaxis=dict(tickprefix="$", tickformat=".2s", title="Total Paid"),
     )
     st.plotly_chart(bar, use_container_width=True)
 
-    # Ranked table: Provider Name, NPI, [State], Taxonomy, Beneficiaries, Total Paid
-    display = df.copy()
-    # Keep numeric beneficiaries so the column stays sortable; format paid as the
-    # last column. (Total Paid is a string for $ formatting; beneficiaries stays int.)
-    display["total_paid"] = display["total_paid"].map(lambda v: f"${v:,.0f}")
+    # Ranked table — aggregate to one row per NPI (sums across any duplicate
+    # taxonomy rows for the same provider), then format.
+    group_keys = ["npi", "provider_name"] + (["state"] if "state" in df.columns else [])
+    tbl = (
+        df.groupby(group_keys, as_index=False)
+        .agg(
+            rank=("rank", "min"),
+            total_beneficiaries=("total_beneficiaries", "sum"),
+            total_paid=("total_paid", "sum"),
+        )
+        .sort_values("rank")
+    )
+    tbl["total_paid"] = tbl["total_paid"].map(fmt_millions)
     rename_map = {
         "rank": "Rank",
         "provider_name": "Provider Name",
         "npi": "NPI",
         "state": "State",
-        "taxonomy": "Taxonomy",
         "total_beneficiaries": "Beneficiaries",
         "total_paid": "Total Paid",
     }
-    # Column order: Rank, Provider Name, NPI, (State), Taxonomy, Beneficiaries, Total Paid
-    if "state" in display.columns:
-        order = ["rank", "provider_name", "npi", "state", "taxonomy",
+    if "state" in tbl.columns:
+        order = ["rank", "provider_name", "npi", "state",
                  "total_beneficiaries", "total_paid"]
     else:
-        order = ["rank", "provider_name", "npi", "taxonomy",
+        order = ["rank", "provider_name", "npi",
                  "total_beneficiaries", "total_paid"]
-    display = display[order].rename(columns=rename_map)
+    display = tbl[order].rename(columns=rename_map)
     st.dataframe(
         display, use_container_width=True, hide_index=True,
         column_config={
             "Beneficiaries": st.column_config.NumberColumn(
-                "Beneficiaries", format="%d"
+                "Beneficiaries", format="%,d"
             ),
         },
     )
@@ -282,7 +319,7 @@ if selected_npi:
         text_labels = [""] * len(trend)
         if len(trend) > 0:
             last_val = trend["total_paid"].iloc[-1]
-            text_labels[-1] = f"${last_val:,.0f}"
+            text_labels[-1] = fmt_millions(last_val)
 
         fig = go.Figure()
         fig.add_trace(
@@ -292,13 +329,16 @@ if selected_npi:
                 line=dict(color=PALETTES["provider_trend"], width=3, shape="spline"),
                 marker=dict(size=10, color=PALETTES["provider_trend"]),
                 text=text_labels, textposition="top center",
-                textfont=dict(size=14, color=PALETTES["provider_trend"]),
-                hovertemplate="Year %{x}<br>Paid $%{y:,.0f}<extra></extra>",
+                textfont=dict(size=18, color=PALETTES["provider_trend"],
+                              family="Arial Black"),
+                hovertemplate="Year %{x}<br>Paid %{customdata}<extra></extra>",
+                customdata=trend["total_paid"].map(fmt_millions),
                 name="Total paid",
             )
         )
         fig.update_layout(
-            yaxis_title="Total Paid ($)", xaxis_title="",
+            yaxis_title="Total Paid", xaxis_title="",
+            yaxis=dict(tickprefix="$", tickformat=".2s"),
             xaxis=dict(dtick=1), height=400,
             margin=dict(l=10, r=10, t=40, b=10),
             plot_bgcolor="rgba(0,0,0,0)", font=dict(size=14),
@@ -306,7 +346,7 @@ if selected_npi:
         st.plotly_chart(fig, use_container_width=True)
 
         yoy = trend[["claim_year", "total_paid", "yoy_pct"]].copy()
-        yoy["total_paid"] = yoy["total_paid"].map(lambda v: f"${v:,.0f}")
+        yoy["total_paid"] = yoy["total_paid"].map(fmt_millions)
         yoy["yoy_pct"] = yoy["yoy_pct"].map(
             lambda v: "—" if v != v else f"{v:+.1f}%"
         )
@@ -362,6 +402,7 @@ else:
     )
     fig.update_layout(
         height=400, xaxis=dict(dtick=1),
+        yaxis=dict(tickprefix="$", tickformat=","),
         margin=dict(l=10, r=10, t=20, b=10),
         plot_bgcolor="rgba(0,0,0,0)", font=dict(size=14),
     )
@@ -373,7 +414,7 @@ else:
         lambda v: "—" if v != v or v is None else f"{v*100:+.1f}%"
     )
     tbl["cost_per_beneficiary"] = tbl["cost_per_beneficiary"].map(lambda v: f"${v:,.2f}")
-    tbl["total_paid"] = tbl["total_paid"].map(lambda v: f"${v:,.0f}")
+    tbl["total_paid"] = tbl["total_paid"].map(fmt_millions)
     tbl = tbl.rename(columns={
         "claim_year": "Year",
         "cost_per_beneficiary": "Cost / Beneficiary",
@@ -385,7 +426,7 @@ else:
     st.dataframe(
         tbl, use_container_width=True, hide_index=True,
         column_config={
-            "Beneficiaries": st.column_config.NumberColumn("Beneficiaries", format="%d"),
+            "Beneficiaries": st.column_config.NumberColumn("Beneficiaries", format="%,d"),
         },
     )
 
@@ -435,6 +476,7 @@ else:
         height=480, coloraxis_showscale=False,
         margin=dict(l=10, r=10, t=20, b=10),
         plot_bgcolor="rgba(0,0,0,0)", font=dict(size=14),
+        yaxis=dict(type="category"),
     )
     fig.update_traces(hovertemplate="%{y}<br>+%{x:.1f}%<extra></extra>")
     st.plotly_chart(fig, use_container_width=True)
@@ -485,9 +527,18 @@ else:
         },
         size_max=40,
     )
+    fig.update_traces(marker=dict(line=dict(width=1, color="#444")))
     fig.update_layout(
         height=560, margin=dict(l=10, r=10, t=20, b=10),
         plot_bgcolor="rgba(0,0,0,0)", font=dict(size=14),
+        xaxis=dict(
+            title_font=dict(size=18), tickfont=dict(size=15),
+            dtick=20, gridcolor="#e2e8f0", gridwidth=1,
+        ),
+        yaxis=dict(
+            title_font=dict(size=18), tickfont=dict(size=15),
+            dtick=20, gridcolor="#e2e8f0", gridwidth=1,
+        ),
     )
     st.plotly_chart(fig, use_container_width=True)
     st.caption(f"Showing {len(df)} codes meeting the maturity and volume filters.")
