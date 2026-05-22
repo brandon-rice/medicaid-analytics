@@ -77,7 +77,7 @@ def fmt_millions(value: float) -> str:
     """Format a dollar amount in millions, e.g. 1234567 -> '$1.23M'."""
     if value is None or value != value:  # None or NaN
         return "—"
-    return f"${value / 1_000_000:,.2f}M"
+    return f"${value / 1_000_000:,.1f}M"
 
 # Canonical 50 states + DC. Used to scrub territory codes / junk from the
 # state dropdowns.
@@ -537,7 +537,7 @@ else:
         ),
         yaxis=dict(
             title_font=dict(size=18), tickfont=dict(size=15),
-            dtick=20, gridcolor="#e2e8f0", gridwidth=1,
+            dtick=200, gridcolor="#e2e8f0", gridwidth=1,
         ),
     )
     st.plotly_chart(fig, use_container_width=True)
