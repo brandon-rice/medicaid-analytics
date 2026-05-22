@@ -22,11 +22,9 @@ The HHS Medicaid Provider Spending dataset has important scope limitations:
 
 ## Findings
 
-[Fill in 2-3 interesting things you discovered. Examples:]
+- **In the year of 2024; the states of NY and CA had 5 out of 10 highest paid NPIs accross the dataset**
+- **In the state of GA for 2024, Scottish Rite Children's Hospital ranked first in total paid amount at $72M, and has ranked in the top 2 organizations by total paid since 2018** 
 
-- **Personal care services (HCPCS T1019) dominate Medicaid outpatient spend nationally**, with the top three billing NPIs all being home-care organizations.
-- **Cost-per-beneficiary for [HCPCS code] grew [X]% from 2018 to 2024**, the largest cumulative increase among codes with >5,000 beneficiaries.
-- **Georgia's HCPCS spend mix differs from the national pattern** in [specific way you observed].
 
 ## Project structure
 
@@ -42,7 +40,7 @@ medicaid-analytics/
 │   │   └── marts/               # dashboard inputs (tables)
 │   └── macros/
 │       └── generate_schema_name.sql
-├── dashboard/                   # Streamlit app (coming soon)
+├── dashboard/                   # Streamlit app
 ├── docs/
 │   └── lineage.png              # dbt lineage graph
 ├── requirements.txt
