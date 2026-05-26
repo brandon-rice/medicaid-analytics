@@ -22,7 +22,7 @@ The HHS Medicaid Provider Spending dataset has important scope limitations:
 
 ## Findings
 
-- **In the year of 2024; the states of NY and CA had 5 out of 10 highest paid NPIs accross the dataset**
+- **In 2024; the states of NY and CA had 5 out of 10 highest paid NPIs accross the dataset**
 - **In the state of GA for 2024, Scottish Rite Children's Hospital ranked first in total paid amount at $72M, and has ranked in the top 2 organizations by total paid since 2018** 
 
 
