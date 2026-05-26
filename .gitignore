@@ -4,3 +4,5 @@
 *.csv
 __pycache__/
 .dbt/
+.streamlit/secrets.toml
+dashboard/.streamlit/secrets.toml
