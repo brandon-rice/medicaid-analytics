@@ -147,6 +147,168 @@ def hcpcs_state_value(label: str) -> str:
 
 
 # ===========================================================================
+# SECTION 0 — GEOGRAPHY & SPEND OVERVIEW
+# ===========================================================================
+st.header("Geography & spend overview")
+
+# --- Chart A: Total spend per year + YOY ------------------------------------
+st.subheader("Total spend by year")
+st.caption("National or state-level Medicaid outpatient and professional spend over time, "
+           "with year-over-year change.")
+
+a_scope = st.selectbox("Geography", ["National"] + states, index=0, key="a_scope")
+
+if a_scope == "National":
+    df = run_query(
+        f"""
+        SELECT EXTRACT(YEAR FROM claim_month)::int AS claim_year,
+               SUM(total_paid)::numeric AS total_paid
+        FROM {SCHEMA}.mart_spend_by_state_month
+        GROUP BY EXTRACT(YEAR FROM claim_month)
+        ORDER BY claim_year
+        """
+    )
+else:
+    df = run_query(
+        f"""
+        SELECT EXTRACT(YEAR FROM claim_month)::int AS claim_year,
+               SUM(total_paid)::numeric AS total_paid
+        FROM {SCHEMA}.mart_spend_by_state_month
+        WHERE practice_state = %s
+        GROUP BY EXTRACT(YEAR FROM claim_month)
+        ORDER BY claim_year
+        """,
+        (a_scope,),
+    )
+
+if df.empty:
+    st.info("No data for that geography.")
+else:
+    df["total_paid"] = df["total_paid"].astype(float)
+    df = df.sort_values("claim_year").reset_index(drop=True)
+    df["yoy_pct"] = df["total_paid"].pct_change() * 100
+
+    # Line chart: spend over time
+    line = go.Figure()
+    line.add_trace(go.Scatter(
+        x=df["claim_year"], y=df["total_paid"],
+        mode="lines+markers+text",
+        line=dict(color="#1f6feb", width=3, shape="spline"),
+        marker=dict(size=10, color="#1f6feb"),
+        text=df["total_paid"].map(fmt_millions),
+        textposition="top center",
+        textfont=dict(size=13, color="#1f6feb"),
+        hovertemplate="Year %{x}<br>%{text}<extra></extra>",
+    ))
+    line.update_layout(
+        height=380, xaxis=dict(dtick=1),
+        yaxis=dict(tickprefix="$", tickformat=".2s", title="Total Paid"),
+        margin=dict(l=10, r=10, t=40, b=10),
+        plot_bgcolor="rgba(0,0,0,0)", font=dict(size=14),
+    )
+    st.plotly_chart(line, use_container_width=True)
+
+    # YOY bar beneath
+    bars = df.dropna(subset=["yoy_pct"]).copy()
+    if not bars.empty:
+        bars["color"] = bars["yoy_pct"].map(lambda v: "#0a9396" if v >= 0 else "#bb3e03")
+        yoy_fig = go.Figure()
+        yoy_fig.add_trace(go.Bar(
+            x=bars["claim_year"], y=bars["yoy_pct"],
+            marker_color=bars["color"],
+            text=bars["yoy_pct"].map(lambda v: f"{v:+.1f}%"),
+            textposition="outside",
+            textfont=dict(size=13),
+            hovertemplate="Year %{x}<br>%{text} vs prior year<extra></extra>",
+        ))
+        yoy_fig.update_layout(
+            height=280, xaxis=dict(dtick=1, title=""),
+            yaxis=dict(ticksuffix="%", title="YOY Change"),
+            margin=dict(l=10, r=10, t=20, b=10),
+            plot_bgcolor="rgba(0,0,0,0)", font=dict(size=14),
+            showlegend=False,
+        )
+        st.plotly_chart(yoy_fig, use_container_width=True)
+
+st.divider()
+
+# --- Chart B: State choropleth ----------------------------------------------
+st.subheader("Spend by state — map")
+st.caption("Total paid and average cost per beneficiary across states. "
+           "Average is computed as total paid ÷ total beneficiaries; the same beneficiary "
+           "can be counted across multiple provider–HCPCS relationships, so this is "
+           "an upper-bound approximation.")
+
+c1, c2 = st.columns(2)
+with c1:
+    map_metric = st.selectbox(
+        "Metric", ["Total paid", "Avg cost per beneficiary"], index=0, key="map_metric"
+    )
+with c2:
+    map_year = st.slider(
+        "Year", min_value=int(min(years)), max_value=int(max(years)),
+        value=int(max(years)), key="map_year",
+    )
+
+map_df = run_query(
+    f"""
+    SELECT practice_state,
+           SUM(total_paid)::numeric AS total_paid,
+           SUM(total_beneficiaries)::bigint AS total_beneficiaries
+    FROM {SCHEMA}.mart_spend_by_state_month
+    WHERE EXTRACT(YEAR FROM claim_month) = %s
+    GROUP BY practice_state
+    """,
+    (int(map_year),),
+)
+
+# Scrub to real states (drops territories etc.)
+map_df = map_df[map_df["practice_state"].isin(US_STATES)].copy()
+
+if map_df.empty:
+    st.info("No data for that year.")
+else:
+    map_df["total_paid"] = map_df["total_paid"].astype(float)
+    map_df["avg_cpb"] = (
+        map_df["total_paid"] / map_df["total_beneficiaries"].replace(0, float("nan"))
+    )
+
+    if map_metric == "Total paid":
+        color_col = "total_paid"
+        color_label = "Total Paid"
+        hover_fmt = map_df["total_paid"].map(fmt_millions)
+        color_scale = "Blues"
+    else:
+        color_col = "avg_cpb"
+        color_label = "Avg Cost / Beneficiary"
+        hover_fmt = map_df["avg_cpb"].map(lambda v: f"${v:,.0f}" if v == v else "—")
+        color_scale = "Purples"
+
+    map_df["hover_value"] = hover_fmt
+
+    fig_map = px.choropleth(
+        map_df, locations="practice_state", locationmode="USA-states",
+        color=color_col, scope="usa",
+        color_continuous_scale=color_scale,
+        labels={color_col: color_label},
+        custom_data=["hover_value"],
+    )
+    fig_map.update_traces(
+        hovertemplate="%{location}<br>%{customdata[0]}<extra></extra>"
+    )
+    fig_map.update_layout(
+        height=500, margin=dict(l=10, r=10, t=20, b=10),
+        font=dict(size=14),
+        coloraxis_colorbar=dict(
+            title=color_label,
+            tickprefix="$" if color_col == "total_paid" else "$",
+            tickformat=".2s" if color_col == "total_paid" else ",",
+        ),
+    )
+    st.plotly_chart(fig_map, use_container_width=True)
+
+
+# ===========================================================================
 # SECTION 1 — PROVIDERS
 # ===========================================================================
 st.header("Providers")
@@ -355,6 +517,74 @@ if selected_npi:
         })
         st.dataframe(yoy, use_container_width=True, hide_index=True)
 
+st.divider()
+
+# --- Insight 2b: Provider rank movement over time (bump chart) --------------
+st.subheader("Provider rank movement")
+st.caption("How the top providers' spend ranking shifts across years. Lines track the "
+           "10 highest-ranked providers in the most recent selected year; a line begins "
+           "or ends where a provider enters or leaves the top 50.")
+
+c1, c2 = st.columns(2)
+with c1:
+    b_scope = st.selectbox("Geography", ["National"] + states, index=0, key="b_scope")
+with c2:
+    yr_min, yr_max = int(min(years)), int(max(years))
+    b_range = st.slider(
+        "Year range", min_value=yr_min, max_value=yr_max,
+        value=(yr_min, yr_max), key="b_range",
+    )
+
+rank_col = "national_rank" if b_scope == "National" else "state_rank"
+scope_filter = "" if b_scope == "National" else "AND practice_state = %s"
+params = [b_range[0], b_range[1]]
+if b_scope != "National":
+    params.append(b_scope)
+
+bump = run_query(
+    f"""
+    SELECT claim_year, billing_npi, provider_name, {rank_col} AS rnk
+    FROM {SCHEMA}.mart_top_providers_yoy
+    WHERE claim_year BETWEEN %s AND %s
+      {scope_filter}
+      AND {rank_col} <= 50
+    ORDER BY claim_year, rnk
+    """,
+    tuple(params),
+)
+
+if bump.empty:
+    st.info("No ranked providers for that selection.")
+else:
+    # Identify the 10 providers holding the best ranks in the most recent year shown.
+    last_yr = bump["claim_year"].max()
+    top10_npis = (
+        bump[bump["claim_year"] == last_yr]
+        .nsmallest(10, "rnk")["billing_npi"]
+        .tolist()
+    )
+    plot_df = bump[bump["billing_npi"].isin(top10_npis)].copy()
+
+    # Short label for legend: provider name truncated + NPI
+    def _short(name):
+        return (name[:28] + "…") if isinstance(name, str) and len(name) > 28 else name
+    plot_df["label"] = plot_df["provider_name"].map(_short)
+
+    fig = px.line(
+        plot_df, x="claim_year", y="rnk", color="label",
+        markers=True,
+        labels={"claim_year": "", "rnk": "Rank", "label": "Provider"},
+    )
+    fig.update_traces(line=dict(width=2.5), marker=dict(size=8))
+    fig.update_layout(
+        height=560, xaxis=dict(dtick=1),
+        yaxis=dict(autorange="reversed", dtick=5),  # rank 1 at top
+        margin=dict(l=10, r=10, t=20, b=10),
+        plot_bgcolor="rgba(0,0,0,0)", font=dict(size=14),
+        legend=dict(font=dict(size=11)),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
 
 # ===========================================================================
 # SECTION 2 — COST TRENDS BY PROCEDURE
@@ -480,6 +710,157 @@ else:
     )
     fig.update_traces(hovertemplate="%{y}<br>+%{x:.1f}%<extra></extra>")
     st.plotly_chart(fig, use_container_width=True)
+
+st.divider()
+
+# --- Chart C: Top 10 HCPCS by geography + year ------------------------------
+st.subheader("Top HCPCS codes by total spend")
+st.caption("The ten highest-spend procedure codes for the selected geography and year.")
+
+c1, c2 = st.columns(2)
+with c1:
+    c4_state_label = st.selectbox("Geography", hcpcs_state_options, index=0, key="c4_state")
+with c2:
+    c4_year = st.selectbox("Year", years, index=0, key="c4_year")
+
+c4_state = hcpcs_state_value(c4_state_label)
+
+df_c4 = run_query(
+    f"""
+    SELECT hcpcs_code, total_paid, total_claims, total_beneficiaries
+    FROM {SCHEMA}.mart_top_hcpcs_by_year
+    WHERE practice_state = %s
+      AND claim_year = %s
+      AND rank_by_spend <= 10
+    ORDER BY rank_by_spend
+    """,
+    (c4_state, int(c4_year)),
+)
+
+if df_c4.empty:
+    st.info("No data for that selection.")
+else:
+    df_c4["total_paid"] = df_c4["total_paid"].astype(float)
+    fig_c4 = px.bar(
+        df_c4.sort_values("total_paid"),
+        x="total_paid", y="hcpcs_code", orientation="h",
+        labels={"total_paid": "Total Paid", "hcpcs_code": "HCPCS"},
+    )
+    fig_c4.update_traces(
+        marker_color="#5a189a",  # purple — new color for visual distinction
+        text=df_c4.sort_values("total_paid")["total_paid"].map(fmt_millions),
+        textposition="outside", cliponaxis=False,
+        textfont=dict(size=13),
+        hovertemplate="%{y}<br>%{text}<extra></extra>",
+    )
+    fig_c4.update_layout(
+        height=460, margin=dict(l=10, r=120, t=20, b=10),
+        plot_bgcolor="rgba(0,0,0,0)", font=dict(size=14),
+        xaxis=dict(tickprefix="$", tickformat=".2s"),
+        yaxis=dict(type="category"),
+    )
+    st.plotly_chart(fig_c4, use_container_width=True)
+
+st.divider()
+
+# --- Chart D: Top cost per beneficiary, with range filter -------------------
+st.subheader("Top HCPCS codes by cost per beneficiary")
+st.caption("Procedure codes ordered by per-beneficiary cost, filtered to a selected range. "
+           "Use this to find codes within a specific cost band rather than the overall most "
+           "expensive.")
+
+c1, c2 = st.columns(2)
+with c1:
+    d5_state_label = st.selectbox("Geography", hcpcs_state_options, index=0, key="d5_state")
+with c2:
+    d5_year = st.selectbox("Year", years, index=0, key="d5_year")
+
+d5_state = hcpcs_state_value(d5_state_label)
+
+# Pull the candidate set for the selected geography + year so we can show
+# reference averages and bound the slider sensibly.
+d5_all = run_query(
+    f"""
+    SELECT hcpcs_code, cost_per_beneficiary, total_beneficiaries, total_paid
+    FROM {SCHEMA}.mart_cost_per_bene_hcpcs_yoy
+    WHERE practice_state = %s
+      AND claim_year = %s
+      AND cost_per_beneficiary IS NOT NULL
+      AND cost_per_beneficiary > 0
+    """,
+    (d5_state, int(d5_year)),
+)
+
+if d5_all.empty:
+    st.info("No data for that geography/year.")
+else:
+    d5_all["cost_per_beneficiary"] = d5_all["cost_per_beneficiary"].astype(float)
+    d5_all["total_paid"] = d5_all["total_paid"].astype(float)
+
+    # Compute the weighted average cost per beneficiary for the selected geography/year.
+    # SUM(total_paid)/SUM(total_beneficiaries) is the right aggregation, not a mean
+    # of the rates.
+    avg_cpb = (
+        d5_all["total_paid"].sum()
+        / max(1, d5_all["total_beneficiaries"].sum())
+    )
+    st.caption(
+        f"Average cost per beneficiary in this geography/year: **${avg_cpb:,.0f}** "
+        f"(across {len(d5_all):,} HCPCS codes). "
+        "Slider bounded at the 1st–99th percentile to avoid extreme outliers."
+    )
+
+    # Percentile-bounded slider so outliers don't compress the useful range.
+    lower = float(d5_all["cost_per_beneficiary"].quantile(0.01))
+    upper = float(d5_all["cost_per_beneficiary"].quantile(0.99))
+    # Round bounds to friendly numbers
+    lower_r = max(0.0, round(lower, 2))
+    upper_r = round(upper, 2)
+    if upper_r <= lower_r:
+        upper_r = lower_r + 1.0  # safety for degenerate cases
+
+    d5_range = st.slider(
+        "Cost-per-beneficiary range ($)",
+        min_value=lower_r, max_value=upper_r,
+        value=(lower_r, upper_r), step=max(1.0, (upper_r - lower_r) / 200),
+        key="d5_range",
+    )
+
+    filtered = d5_all[
+        (d5_all["cost_per_beneficiary"] >= d5_range[0])
+        & (d5_all["cost_per_beneficiary"] <= d5_range[1])
+    ].copy()
+
+    if filtered.empty:
+        st.info("No HCPCS codes fall within that range.")
+    else:
+        top = filtered.nlargest(15, "cost_per_beneficiary").sort_values(
+            "cost_per_beneficiary"
+        )
+        fig_d5 = px.bar(
+            top, x="cost_per_beneficiary", y="hcpcs_code", orientation="h",
+            labels={
+                "cost_per_beneficiary": "Cost per Beneficiary ($)",
+                "hcpcs_code": "HCPCS",
+            },
+        )
+        fig_d5.update_traces(
+            marker_color="#0a9396",  # teal
+            text=top["cost_per_beneficiary"].map(lambda v: f"${v:,.0f}"),
+            textposition="outside", cliponaxis=False,
+            textfont=dict(size=13),
+            hovertemplate="%{y}<br>$%{x:,.0f} per beneficiary<extra></extra>",
+        )
+        fig_d5.update_layout(
+            height=520, margin=dict(l=10, r=120, t=20, b=10),
+            plot_bgcolor="rgba(0,0,0,0)", font=dict(size=14),
+            xaxis=dict(tickprefix="$", tickformat=","),
+            yaxis=dict(type="category"),
+        )
+        st.plotly_chart(fig_d5, use_container_width=True)
+        st.caption(
+            f"Showing top 15 of {len(filtered):,} codes in the selected range."
+        )
 
 
 # ===========================================================================
