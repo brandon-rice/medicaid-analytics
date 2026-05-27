@@ -132,6 +132,7 @@ years = run_query(
     f"SELECT DISTINCT claim_year FROM {SCHEMA}.mart_top_providers_yoy "
     f"ORDER BY claim_year DESC"
 )["claim_year"].tolist()
+latest_year = int(max(years))
 
 _raw_hcpcs_states = run_query(
     f"SELECT DISTINCT practice_state FROM {SCHEMA}.mart_cost_per_bene_hcpcs_yoy "
@@ -188,23 +189,32 @@ else:
     df = df.sort_values("claim_year").reset_index(drop=True)
     df["yoy_pct"] = df["total_paid"].pct_change() * 100
 
+    # Convert to millions for plotting, so the y-axis reads cleanly as $X,XXXM
+    # without Plotly auto-switching to "G" units when values exceed a billion.
+    df["paid_m"] = df["total_paid"] / 1_000_000
+
     # Line chart: spend over time
     line = go.Figure()
     line.add_trace(go.Scatter(
-        x=df["claim_year"], y=df["total_paid"],
+        x=df["claim_year"], y=df["paid_m"],
         mode="lines+markers+text",
-        line=dict(color="#1f6feb", width=3, shape="spline"),
-        marker=dict(size=10, color="#1f6feb"),
+        line=dict(color="#1f6feb", width=4, shape="spline"),
+        marker=dict(size=12, color="#1f6feb"),
         text=df["total_paid"].map(fmt_millions),
         textposition="top center",
-        textfont=dict(size=13, color="#1f6feb"),
+        textfont=dict(size=16, color="#1f6feb"),
         hovertemplate="Year %{x}<br>%{text}<extra></extra>",
     ))
     line.update_layout(
-        height=380, xaxis=dict(dtick=1),
-        yaxis=dict(tickprefix="$", tickformat=".2s", title="Total Paid"),
+        height=420, xaxis=dict(dtick=1, tickfont=dict(size=15),
+                               title_font=dict(size=16)),
+        yaxis=dict(
+            tickprefix="$", tickformat=",.0f", ticksuffix="M",
+            title="Total Paid (in Millions)",
+            tickfont=dict(size=15), title_font=dict(size=16),
+        ),
         margin=dict(l=10, r=10, t=40, b=10),
-        plot_bgcolor="rgba(0,0,0,0)", font=dict(size=14),
+        plot_bgcolor="rgba(0,0,0,0)", font=dict(size=15),
     )
     st.plotly_chart(line, use_container_width=True)
 
@@ -218,14 +228,16 @@ else:
             marker_color=bars["color"],
             text=bars["yoy_pct"].map(lambda v: f"{v:+.1f}%"),
             textposition="outside",
-            textfont=dict(size=13),
+            textfont=dict(size=15),
             hovertemplate="Year %{x}<br>%{text} vs prior year<extra></extra>",
         ))
         yoy_fig.update_layout(
-            height=280, xaxis=dict(dtick=1, title=""),
-            yaxis=dict(ticksuffix="%", title="YOY Change"),
+            height=300,
+            xaxis=dict(dtick=1, title="", tickfont=dict(size=15)),
+            yaxis=dict(ticksuffix="%", title="YOY Change",
+                       tickfont=dict(size=15), title_font=dict(size=16)),
             margin=dict(l=10, r=10, t=20, b=10),
-            plot_bgcolor="rgba(0,0,0,0)", font=dict(size=14),
+            plot_bgcolor="rgba(0,0,0,0)", font=dict(size=15),
             showlegend=False,
         )
         st.plotly_chart(yoy_fig, use_container_width=True)
@@ -245,9 +257,8 @@ with c1:
         "Metric", ["Total paid", "Avg cost per beneficiary"], index=0, key="map_metric"
     )
 with c2:
-    map_year = st.slider(
-        "Year", min_value=int(min(years)), max_value=int(max(years)),
-        value=int(max(years)), key="map_year",
+    map_year = st.selectbox(
+        "Year", options=years, index=0, key="map_year",
     )
 
 map_df = run_query(
@@ -269,20 +280,25 @@ if map_df.empty:
     st.info("No data for that year.")
 else:
     map_df["total_paid"] = map_df["total_paid"].astype(float)
+    map_df["paid_m"] = map_df["total_paid"] / 1_000_000  # for color scale in millions
     map_df["avg_cpb"] = (
         map_df["total_paid"] / map_df["total_beneficiaries"].replace(0, float("nan"))
     )
 
     if map_metric == "Total paid":
-        color_col = "total_paid"
-        color_label = "Total Paid"
+        color_col = "paid_m"
+        color_label = "Total Paid (Millions)"
         hover_fmt = map_df["total_paid"].map(fmt_millions)
         color_scale = "Blues"
+        colorbar = dict(title=color_label, tickprefix="$", ticksuffix="M",
+                        tickformat=",.0f", tickfont=dict(size=13))
     else:
         color_col = "avg_cpb"
         color_label = "Avg Cost / Beneficiary"
         hover_fmt = map_df["avg_cpb"].map(lambda v: f"${v:,.0f}" if v == v else "—")
         color_scale = "Purples"
+        colorbar = dict(title=color_label, tickprefix="$", tickformat=",",
+                        tickfont=dict(size=13))
 
     map_df["hover_value"] = hover_fmt
 
@@ -299,11 +315,7 @@ else:
     fig_map.update_layout(
         height=500, margin=dict(l=10, r=10, t=20, b=10),
         font=dict(size=14),
-        coloraxis_colorbar=dict(
-            title=color_label,
-            tickprefix="$" if color_col == "total_paid" else "$",
-            tickformat=".2s" if color_col == "total_paid" else ",",
-        ),
+        coloraxis_colorbar=colorbar,
     )
     st.plotly_chart(fig_map, use_container_width=True)
 
@@ -366,14 +378,21 @@ else:
         marker_color=PALETTES["provider_bar"],
         text=top15["total_paid"].map(fmt_millions),
         textposition="outside", cliponaxis=False,
-        textfont=dict(size=13),
+        textfont=dict(size=15),
         hovertemplate="%{y}<br>%{customdata}<extra></extra>",
         customdata=top15["total_paid"].map(fmt_millions),
     )
+    # Plot in millions so the x-axis reads cleanly (no "G" suffix at $1B+).
+    bar.update_traces(x=top15["total_paid"] / 1_000_000)
     bar.update_layout(
-        height=520, margin=dict(l=10, r=120, t=20, b=10),
-        plot_bgcolor="rgba(0,0,0,0)", font=dict(size=14),
-        xaxis=dict(tickprefix="$", tickformat=".2s", title="Total Paid"),
+        height=560, margin=dict(l=10, r=130, t=20, b=10),
+        plot_bgcolor="rgba(0,0,0,0)", font=dict(size=16),
+        xaxis=dict(
+            tickprefix="$", tickformat=",.0f", ticksuffix="M",
+            title="Total Paid (in Millions)",
+            tickfont=dict(size=14), title_font=dict(size=16),
+        ),
+        yaxis=dict(tickfont=dict(size=14)),
     )
     st.plotly_chart(bar, use_container_width=True)
 
@@ -556,11 +575,11 @@ bump = run_query(
 if bump.empty:
     st.info("No ranked providers for that selection.")
 else:
-    # Identify the 10 providers holding the best ranks in the most recent year shown.
+    # Identify the 7 providers holding the best ranks in the most recent year shown.
     last_yr = bump["claim_year"].max()
     top10_npis = (
         bump[bump["claim_year"] == last_yr]
-        .nsmallest(10, "rnk")["billing_npi"]
+        .nsmallest(7, "rnk")["billing_npi"]
         .tolist()
     )
     plot_df = bump[bump["billing_npi"].isin(top10_npis)].copy()
@@ -575,13 +594,14 @@ else:
         markers=True,
         labels={"claim_year": "", "rnk": "Rank", "label": "Provider"},
     )
-    fig.update_traces(line=dict(width=2.5), marker=dict(size=8))
+    fig.update_traces(line=dict(width=4.5), marker=dict(size=11))
     fig.update_layout(
-        height=560, xaxis=dict(dtick=1),
-        yaxis=dict(autorange="reversed", dtick=5),  # rank 1 at top
+        height=580, xaxis=dict(dtick=1, tickfont=dict(size=15)),
+        yaxis=dict(autorange="reversed", dtick=5,
+                   tickfont=dict(size=15), title_font=dict(size=16)),
         margin=dict(l=10, r=10, t=20, b=10),
-        plot_bgcolor="rgba(0,0,0,0)", font=dict(size=14),
-        legend=dict(font=dict(size=11)),
+        plot_bgcolor="rgba(0,0,0,0)", font=dict(size=15),
+        legend=dict(font=dict(size=12)),
     )
     st.plotly_chart(fig, use_container_width=True)
 
@@ -590,178 +610,6 @@ else:
 # SECTION 2 — COST TRENDS BY PROCEDURE
 # ===========================================================================
 st.header("Cost trends by procedure")
-
-# --- Insight 3: Single HCPCS cost-per-beneficiary trend (chart + table) ----
-st.subheader("Cost per beneficiary — single procedure code")
-st.caption("How the per-beneficiary cost of one HCPCS code has moved over time.")
-
-c1, c2 = st.columns(2)
-with c1:
-    hcpcs_codes = run_query(
-        f"SELECT DISTINCT hcpcs_code FROM {SCHEMA}.mart_cost_per_bene_hcpcs_yoy "
-        f"ORDER BY hcpcs_code"
-    )["hcpcs_code"].tolist()
-    default_hcpcs_idx = hcpcs_codes.index(DEFAULT_HCPCS) if DEFAULT_HCPCS in hcpcs_codes else 0
-    h3_code = st.selectbox("HCPCS code", hcpcs_codes, index=default_hcpcs_idx, key="h3_code")
-with c2:
-    h3_state_label = st.selectbox("Geography", hcpcs_state_options, index=0, key="h3_state")
-
-h3_state = hcpcs_state_value(h3_state_label)
-
-df = run_query(
-    f"""
-    SELECT claim_year, cost_per_beneficiary, total_beneficiaries,
-           total_paid, yoy_pct_change
-    FROM {SCHEMA}.mart_cost_per_bene_hcpcs_yoy
-    WHERE hcpcs_code = %s AND practice_state = %s
-    ORDER BY claim_year
-    """,
-    (h3_code, h3_state),
-)
-
-if df.empty:
-    st.info("No data for that code/geography combination.")
-else:
-    fig = px.area(
-        df, x="claim_year", y="cost_per_beneficiary",
-        labels={"claim_year": "", "cost_per_beneficiary": "Cost per Beneficiary ($)"},
-    )
-    fig.update_traces(
-        line_color=PALETTES["hcpcs_trend"], fillcolor="rgba(202,106,2,0.12)",
-        mode="lines+markers", line_shape="spline",
-    )
-    fig.update_layout(
-        height=400, xaxis=dict(dtick=1),
-        yaxis=dict(tickprefix="$", tickformat=","),
-        margin=dict(l=10, r=10, t=20, b=10),
-        plot_bgcolor="rgba(0,0,0,0)", font=dict(size=14),
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-    # Table beneath the chart
-    tbl = df.copy()
-    tbl["yoy_pct_change"] = tbl["yoy_pct_change"].map(
-        lambda v: "—" if v != v or v is None else f"{v*100:+.1f}%"
-    )
-    tbl["cost_per_beneficiary"] = tbl["cost_per_beneficiary"].map(lambda v: f"${v:,.2f}")
-    tbl["total_paid"] = tbl["total_paid"].map(fmt_millions)
-    tbl = tbl.rename(columns={
-        "claim_year": "Year",
-        "cost_per_beneficiary": "Cost / Beneficiary",
-        "total_beneficiaries": "Beneficiaries",
-        "total_paid": "Total Paid",
-        "yoy_pct_change": "YOY Change",
-    })
-    tbl = tbl[["Year", "Cost / Beneficiary", "YOY Change", "Beneficiaries", "Total Paid"]]
-    st.dataframe(
-        tbl, use_container_width=True, hide_index=True,
-        column_config={
-            "Beneficiaries": st.column_config.NumberColumn("Beneficiaries", format="%,d"),
-        },
-    )
-
-st.divider()
-
-# --- Insight 4: Largest YOY cost-per-beneficiary increases -----------------
-st.subheader("Largest year-over-year cost increases")
-st.caption("HCPCS codes whose cost per beneficiary jumped the most in the latest year, "
-           "filtered to codes with a meaningful beneficiary base.")
-
-c1, c2 = st.columns(2)
-with c1:
-    i4_state_label = st.selectbox("Geography", hcpcs_state_options, index=0, key="i4_state")
-with c2:
-    i4_minben = st.select_slider(
-        "Minimum beneficiaries", options=[100, 500, 1000, 5000, 10000],
-        value=1000, key="i4_minben",
-    )
-
-i4_state = hcpcs_state_value(i4_state_label)
-latest_year = int(max(years))
-
-df = run_query(
-    f"""
-    SELECT hcpcs_code, cost_per_beneficiary, prior_year_cpb,
-           yoy_pct_change, total_beneficiaries
-    FROM {SCHEMA}.mart_cost_per_bene_hcpcs_yoy
-    WHERE practice_state = %s AND claim_year = %s
-      AND yoy_pct_change IS NOT NULL AND total_beneficiaries >= %s
-    ORDER BY yoy_pct_change DESC
-    LIMIT 15
-    """,
-    (i4_state, latest_year, int(i4_minben)),
-)
-
-if df.empty:
-    st.info("No qualifying codes for that selection.")
-else:
-    df["yoy_label"] = df["yoy_pct_change"] * 100
-    fig = px.bar(
-        df.sort_values("yoy_pct_change"),
-        x="yoy_label", y="hcpcs_code", orientation="h",
-        color="yoy_label", color_continuous_scale=PALETTES["yoy_increase"],
-        labels={"yoy_label": "YOY change (%)", "hcpcs_code": "HCPCS"},
-    )
-    fig.update_layout(
-        height=480, coloraxis_showscale=False,
-        margin=dict(l=10, r=10, t=20, b=10),
-        plot_bgcolor="rgba(0,0,0,0)", font=dict(size=14),
-        yaxis=dict(type="category"),
-    )
-    fig.update_traces(hovertemplate="%{y}<br>+%{x:.1f}%<extra></extra>")
-    st.plotly_chart(fig, use_container_width=True)
-
-st.divider()
-
-# --- Chart C: Top 10 HCPCS by geography + year ------------------------------
-st.subheader("Top HCPCS codes by total spend")
-st.caption("The ten highest-spend procedure codes for the selected geography and year.")
-
-c1, c2 = st.columns(2)
-with c1:
-    c4_state_label = st.selectbox("Geography", hcpcs_state_options, index=0, key="c4_state")
-with c2:
-    c4_year = st.selectbox("Year", years, index=0, key="c4_year")
-
-c4_state = hcpcs_state_value(c4_state_label)
-
-df_c4 = run_query(
-    f"""
-    SELECT hcpcs_code, total_paid, total_claims, total_beneficiaries
-    FROM {SCHEMA}.mart_top_hcpcs_by_year
-    WHERE practice_state = %s
-      AND claim_year = %s
-      AND rank_by_spend <= 10
-    ORDER BY rank_by_spend
-    """,
-    (c4_state, int(c4_year)),
-)
-
-if df_c4.empty:
-    st.info("No data for that selection.")
-else:
-    df_c4["total_paid"] = df_c4["total_paid"].astype(float)
-    fig_c4 = px.bar(
-        df_c4.sort_values("total_paid"),
-        x="total_paid", y="hcpcs_code", orientation="h",
-        labels={"total_paid": "Total Paid", "hcpcs_code": "HCPCS"},
-    )
-    fig_c4.update_traces(
-        marker_color="#5a189a",  # purple — new color for visual distinction
-        text=df_c4.sort_values("total_paid")["total_paid"].map(fmt_millions),
-        textposition="outside", cliponaxis=False,
-        textfont=dict(size=13),
-        hovertemplate="%{y}<br>%{text}<extra></extra>",
-    )
-    fig_c4.update_layout(
-        height=460, margin=dict(l=10, r=120, t=20, b=10),
-        plot_bgcolor="rgba(0,0,0,0)", font=dict(size=14),
-        xaxis=dict(tickprefix="$", tickformat=".2s"),
-        yaxis=dict(type="category"),
-    )
-    st.plotly_chart(fig_c4, use_container_width=True)
-
-st.divider()
 
 # --- Chart D: Top cost per beneficiary, with range filter -------------------
 st.subheader("Top HCPCS codes by cost per beneficiary")
@@ -861,6 +709,127 @@ else:
         st.caption(
             f"Showing top 15 of {len(filtered):,} codes in the selected range."
         )
+
+st.divider()
+
+# --- Insight 3: Single HCPCS cost-per-beneficiary trend (chart + table) ----
+st.subheader("Cost per beneficiary — single procedure code")
+st.caption("How the per-beneficiary cost of one HCPCS code has moved over time.")
+
+c1, c2 = st.columns(2)
+with c1:
+    hcpcs_codes = run_query(
+        f"SELECT DISTINCT hcpcs_code FROM {SCHEMA}.mart_cost_per_bene_hcpcs_yoy "
+        f"ORDER BY hcpcs_code"
+    )["hcpcs_code"].tolist()
+    default_hcpcs_idx = hcpcs_codes.index(DEFAULT_HCPCS) if DEFAULT_HCPCS in hcpcs_codes else 0
+    h3_code = st.selectbox("HCPCS code", hcpcs_codes, index=default_hcpcs_idx, key="h3_code")
+with c2:
+    h3_state_label = st.selectbox("Geography", hcpcs_state_options, index=0, key="h3_state")
+
+h3_state = hcpcs_state_value(h3_state_label)
+
+df = run_query(
+    f"""
+    SELECT claim_year, cost_per_beneficiary, total_beneficiaries,
+           total_paid, yoy_pct_change
+    FROM {SCHEMA}.mart_cost_per_bene_hcpcs_yoy
+    WHERE hcpcs_code = %s AND practice_state = %s
+    ORDER BY claim_year
+    """,
+    (h3_code, h3_state),
+)
+
+if df.empty:
+    st.info("No data for that code/geography combination.")
+else:
+    fig = px.area(
+        df, x="claim_year", y="cost_per_beneficiary",
+        labels={"claim_year": "", "cost_per_beneficiary": "Cost per Beneficiary ($)"},
+    )
+    fig.update_traces(
+        line_color=PALETTES["hcpcs_trend"], fillcolor="rgba(202,106,2,0.12)",
+        mode="lines+markers", line_shape="spline",
+    )
+    fig.update_layout(
+        height=400, xaxis=dict(dtick=1),
+        yaxis=dict(tickprefix="$", tickformat=","),
+        margin=dict(l=10, r=10, t=20, b=10),
+        plot_bgcolor="rgba(0,0,0,0)", font=dict(size=14),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Table beneath the chart
+    tbl = df.copy()
+    tbl["yoy_pct_change"] = tbl["yoy_pct_change"].map(
+        lambda v: "—" if v != v or v is None else f"{v*100:+.1f}%"
+    )
+    tbl["cost_per_beneficiary"] = tbl["cost_per_beneficiary"].map(lambda v: f"${v:,.2f}")
+    tbl["total_paid"] = tbl["total_paid"].map(fmt_millions)
+    tbl = tbl.rename(columns={
+        "claim_year": "Year",
+        "cost_per_beneficiary": "Cost / Beneficiary",
+        "total_beneficiaries": "Beneficiaries",
+        "total_paid": "Total Paid",
+        "yoy_pct_change": "YOY Change",
+    })
+    tbl = tbl[["Year", "Cost / Beneficiary", "YOY Change", "Beneficiaries", "Total Paid"]]
+    st.dataframe(
+        tbl, use_container_width=True, hide_index=True,
+        column_config={
+            "Beneficiaries": st.column_config.NumberColumn("Beneficiaries", format="%,d"),
+        },
+    )
+
+st.divider()
+
+# --- Chart C: Top 10 HCPCS by geography + year ------------------------------
+st.subheader("Top HCPCS codes by total spend")
+st.caption("The ten highest-spend procedure codes for the selected geography and year.")
+
+c1, c2 = st.columns(2)
+with c1:
+    c4_state_label = st.selectbox("Geography", hcpcs_state_options, index=0, key="c4_state")
+with c2:
+    c4_year = st.selectbox("Year", years, index=0, key="c4_year")
+
+c4_state = hcpcs_state_value(c4_state_label)
+
+df_c4 = run_query(
+    f"""
+    SELECT hcpcs_code, total_paid, total_claims, total_beneficiaries
+    FROM {SCHEMA}.mart_top_hcpcs_by_year
+    WHERE practice_state = %s
+      AND claim_year = %s
+      AND rank_by_spend <= 10
+    ORDER BY rank_by_spend
+    """,
+    (c4_state, int(c4_year)),
+)
+
+if df_c4.empty:
+    st.info("No data for that selection.")
+else:
+    df_c4["total_paid"] = df_c4["total_paid"].astype(float)
+    fig_c4 = px.bar(
+        df_c4.sort_values("total_paid"),
+        x="total_paid", y="hcpcs_code", orientation="h",
+        labels={"total_paid": "Total Paid", "hcpcs_code": "HCPCS"},
+    )
+    fig_c4.update_traces(
+        marker_color="#5a189a",  # purple — new color for visual distinction
+        text=df_c4.sort_values("total_paid")["total_paid"].map(fmt_millions),
+        textposition="outside", cliponaxis=False,
+        textfont=dict(size=13),
+        hovertemplate="%{y}<br>%{text}<extra></extra>",
+    )
+    fig_c4.update_layout(
+        height=460, margin=dict(l=10, r=120, t=20, b=10),
+        plot_bgcolor="rgba(0,0,0,0)", font=dict(size=14),
+        xaxis=dict(tickprefix="$", tickformat=".2s"),
+        yaxis=dict(type="category"),
+    )
+    st.plotly_chart(fig_c4, use_container_width=True)
 
 
 # ===========================================================================
