@@ -257,27 +257,33 @@ with c1:
         "Metric", ["Total paid", "Avg cost per beneficiary"], index=0, key="map_metric"
     )
 with c2:
-    map_year = st.selectbox(
-        "Year", options=years, index=0, key="map_year",
+    map_years_sel = st.multiselect(
+        "Year(s)", options=years, default=[int(max(years))], key="map_years",
     )
 
-map_df = run_query(
-    f"""
-    SELECT practice_state,
-           SUM(total_paid)::numeric AS total_paid,
-           SUM(total_beneficiaries)::bigint AS total_beneficiaries
-    FROM {SCHEMA}.mart_spend_by_state_month
-    WHERE EXTRACT(YEAR FROM claim_month) = %s
-    GROUP BY practice_state
-    """,
-    (int(map_year),),
-)
+if not map_years_sel:
+    st.info("Select at least one year.")
+    map_df = None
+else:
+    placeholders = ",".join(["%s"] * len(map_years_sel))
+    map_df = run_query(
+        f"""
+        SELECT practice_state,
+               SUM(total_paid)::numeric AS total_paid,
+               SUM(total_beneficiaries)::bigint AS total_beneficiaries
+        FROM {SCHEMA}.mart_spend_by_state_month
+        WHERE EXTRACT(YEAR FROM claim_month) IN ({placeholders})
+        GROUP BY practice_state
+        """,
+        tuple(int(y) for y in map_years_sel),
+    )
+    # Scrub to real states (drops territories etc.)
+    map_df = map_df[map_df["practice_state"].isin(US_STATES)].copy()
 
-# Scrub to real states (drops territories etc.)
-map_df = map_df[map_df["practice_state"].isin(US_STATES)].copy()
-
-if map_df.empty:
-    st.info("No data for that year.")
+if map_df is None:
+    pass
+elif map_df.empty:
+    st.info("No data for that selection.")
 else:
     map_df["total_paid"] = map_df["total_paid"].astype(float)
     map_df["paid_m"] = map_df["total_paid"] / 1_000_000  # for color scale in millions
@@ -327,40 +333,71 @@ st.header("Providers")
 
 # --- Insight 1: Top providers by spend (table + bar chart) -----------------
 st.subheader("Top providers by spend")
-st.caption("The highest-paid billing providers for a given year and geography.")
+st.caption("The highest-paid billing providers for the selected year(s) and geography. "
+           "When multiple years are selected, paid amounts are summed across years and "
+           "providers are reranked within that window.")
 
 c1, c2 = st.columns(2)
 with c1:
-    p1_year = st.selectbox("Year", years, index=0, key="p1_year")
+    p1_years_sel = st.multiselect(
+        "Year(s)", years, default=[int(max(years))], key="p1_years",
+    )
 with c2:
     p1_scope = st.selectbox("Geography", ["National"] + states, index=0, key="p1_scope")
 
-if p1_scope == "National":
-    df = run_query(
-        f"""
-        SELECT national_rank AS rank, provider_name, billing_npi AS npi,
-               practice_state AS state, primary_taxonomy AS taxonomy,
-               total_beneficiaries, total_paid
-        FROM {SCHEMA}.mart_top_providers_yoy
-        WHERE claim_year = %s AND national_rank <= 25
-        ORDER BY national_rank
-        """,
-        (int(p1_year),),
-    )
+if not p1_years_sel:
+    st.info("Select at least one year.")
+    df = None
 else:
-    df = run_query(
-        f"""
-        SELECT state_rank AS rank, provider_name, billing_npi AS npi,
-               primary_taxonomy AS taxonomy, total_beneficiaries, total_paid
-        FROM {SCHEMA}.mart_top_providers_yoy
-        WHERE claim_year = %s AND practice_state = %s AND state_rank <= 25
-        ORDER BY state_rank
-        """,
-        (int(p1_year), p1_scope),
-    )
+    placeholders = ",".join(["%s"] * len(p1_years_sel))
+    year_params = tuple(int(y) for y in p1_years_sel)
 
-if df.empty:
-    st.info("No providers found for that selection.")
+    if p1_scope == "National":
+        df_raw = run_query(
+            f"""
+            SELECT provider_name, billing_npi AS npi,
+                   practice_state AS state, primary_taxonomy AS taxonomy,
+                   total_beneficiaries, total_paid
+            FROM {SCHEMA}.mart_top_providers_yoy
+            WHERE claim_year IN ({placeholders})
+              AND national_rank <= 50
+            """,
+            year_params,
+        )
+    else:
+        df_raw = run_query(
+            f"""
+            SELECT provider_name, billing_npi AS npi,
+                   primary_taxonomy AS taxonomy,
+                   total_beneficiaries, total_paid
+            FROM {SCHEMA}.mart_top_providers_yoy
+            WHERE claim_year IN ({placeholders})
+              AND practice_state = %s
+              AND state_rank <= 50
+            """,
+            year_params + (p1_scope,),
+        )
+
+    # Sum across the selected years per NPI, then rerank
+    group_keys = ["npi", "provider_name"]
+    if "state" in df_raw.columns:
+        group_keys.append("state")
+    df = (
+        df_raw.groupby(group_keys, as_index=False)
+        .agg(
+            total_beneficiaries=("total_beneficiaries", "sum"),
+            total_paid=("total_paid", "sum"),
+        )
+        .sort_values("total_paid", ascending=False)
+        .head(25)
+        .reset_index(drop=True)
+    )
+    df["rank"] = df.index + 1
+    df["taxonomy"] = ""  # placeholder kept for downstream code; column unused
+
+if df is None or df.empty:
+    if df is not None:
+        st.info("No providers found for that selection.")
 else:
     # Bar chart: top 15 by spend
     # Collapse to one row per provider (an NPI can have >1 taxonomy row in NPPES,
@@ -611,6 +648,61 @@ else:
 # ===========================================================================
 st.header("Cost trends by procedure")
 
+# --- Chart C: Top 10 HCPCS by geography + year ------------------------------
+st.subheader("Top HCPCS codes by total spend")
+st.caption("The ten highest-spend procedure codes for the selected geography and year.")
+
+c1, c2 = st.columns(2)
+with c1:
+    c4_state_label = st.selectbox("Geography", hcpcs_state_options, index=0, key="c4_state")
+with c2:
+    c4_year = st.selectbox("Year", years, index=0, key="c4_year")
+
+c4_state = hcpcs_state_value(c4_state_label)
+
+df_c4 = run_query(
+    f"""
+    SELECT hcpcs_code, total_paid, total_claims, total_beneficiaries
+    FROM {SCHEMA}.mart_top_hcpcs_by_year
+    WHERE practice_state = %s
+      AND claim_year = %s
+      AND rank_by_spend <= 10
+    ORDER BY rank_by_spend
+    """,
+    (c4_state, int(c4_year)),
+)
+
+if df_c4.empty:
+    st.info("No data for that selection.")
+else:
+    df_c4["total_paid"] = df_c4["total_paid"].astype(float)
+    df_c4_sorted = df_c4.sort_values("total_paid").copy()
+    df_c4_sorted["paid_m"] = df_c4_sorted["total_paid"] / 1_000_000
+    fig_c4 = px.bar(
+        df_c4_sorted,
+        x="paid_m", y="hcpcs_code", orientation="h",
+        labels={"paid_m": "Total Paid (in Millions)", "hcpcs_code": "HCPCS"},
+    )
+    fig_c4.update_traces(
+        marker_color="#5a189a",  # purple — new color for visual distinction
+        text=df_c4_sorted["total_paid"].map(fmt_millions),
+        textposition="outside", cliponaxis=False,
+        textfont=dict(size=15),
+        hovertemplate="%{y}<br>%{text}<extra></extra>",
+    )
+    fig_c4.update_layout(
+        height=500, margin=dict(l=10, r=130, t=20, b=10),
+        plot_bgcolor="rgba(0,0,0,0)", font=dict(size=15),
+        xaxis=dict(
+            tickprefix="$", tickformat=",.0f", ticksuffix="M",
+            tickfont=dict(size=14), title_font=dict(size=16),
+        ),
+        yaxis=dict(type="category", tickfont=dict(size=14)),
+    )
+    st.plotly_chart(fig_c4, use_container_width=True)
+
+st.divider()
+
 # --- Chart D: Top cost per beneficiary, with range filter -------------------
 st.subheader("Top HCPCS codes by cost per beneficiary")
 st.caption("Procedure codes ordered by per-beneficiary cost, filtered to a selected range. "
@@ -722,8 +814,25 @@ with c1:
         f"SELECT DISTINCT hcpcs_code FROM {SCHEMA}.mart_cost_per_bene_hcpcs_yoy "
         f"ORDER BY hcpcs_code"
     )["hcpcs_code"].tolist()
-    default_hcpcs_idx = hcpcs_codes.index(DEFAULT_HCPCS) if DEFAULT_HCPCS in hcpcs_codes else 0
-    h3_code = st.selectbox("HCPCS code", hcpcs_codes, index=default_hcpcs_idx, key="h3_code")
+    code_search = st.text_input(
+        "Search HCPCS code",
+        value="", key="h3_search",
+        placeholder="Type to filter (e.g. T1019, 99213, J)",
+    )
+    if code_search.strip():
+        filtered_codes = [c for c in hcpcs_codes
+                          if code_search.strip().upper() in c.upper()]
+        if not filtered_codes:
+            st.info("No codes match.")
+            filtered_codes = hcpcs_codes
+    else:
+        filtered_codes = hcpcs_codes
+    default_hcpcs_idx = (
+        filtered_codes.index(DEFAULT_HCPCS) if DEFAULT_HCPCS in filtered_codes else 0
+    )
+    h3_code = st.selectbox(
+        "HCPCS code", filtered_codes, index=default_hcpcs_idx, key="h3_code"
+    )
 with c2:
     h3_state_label = st.selectbox("Geography", hcpcs_state_options, index=0, key="h3_state")
 
@@ -781,55 +890,6 @@ else:
         },
     )
 
-st.divider()
-
-# --- Chart C: Top 10 HCPCS by geography + year ------------------------------
-st.subheader("Top HCPCS codes by total spend")
-st.caption("The ten highest-spend procedure codes for the selected geography and year.")
-
-c1, c2 = st.columns(2)
-with c1:
-    c4_state_label = st.selectbox("Geography", hcpcs_state_options, index=0, key="c4_state")
-with c2:
-    c4_year = st.selectbox("Year", years, index=0, key="c4_year")
-
-c4_state = hcpcs_state_value(c4_state_label)
-
-df_c4 = run_query(
-    f"""
-    SELECT hcpcs_code, total_paid, total_claims, total_beneficiaries
-    FROM {SCHEMA}.mart_top_hcpcs_by_year
-    WHERE practice_state = %s
-      AND claim_year = %s
-      AND rank_by_spend <= 10
-    ORDER BY rank_by_spend
-    """,
-    (c4_state, int(c4_year)),
-)
-
-if df_c4.empty:
-    st.info("No data for that selection.")
-else:
-    df_c4["total_paid"] = df_c4["total_paid"].astype(float)
-    fig_c4 = px.bar(
-        df_c4.sort_values("total_paid"),
-        x="total_paid", y="hcpcs_code", orientation="h",
-        labels={"total_paid": "Total Paid", "hcpcs_code": "HCPCS"},
-    )
-    fig_c4.update_traces(
-        marker_color="#5a189a",  # purple — new color for visual distinction
-        text=df_c4.sort_values("total_paid")["total_paid"].map(fmt_millions),
-        textposition="outside", cliponaxis=False,
-        textfont=dict(size=13),
-        hovertemplate="%{y}<br>%{text}<extra></extra>",
-    )
-    fig_c4.update_layout(
-        height=460, margin=dict(l=10, r=120, t=20, b=10),
-        plot_bgcolor="rgba(0,0,0,0)", font=dict(size=14),
-        xaxis=dict(tickprefix="$", tickformat=".2s"),
-        yaxis=dict(type="category"),
-    )
-    st.plotly_chart(fig_c4, use_container_width=True)
 
 
 # ===========================================================================
