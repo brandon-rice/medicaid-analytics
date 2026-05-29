@@ -29,8 +29,8 @@ The HHS Medicaid Provider Spending dataset has important scope limitations:
 
 
 ## Project structure
-
-./
+```
+medicaid-analytics/
 ├── ingest/                      # Python loaders (one-time setup)
 │   ├── load_medicaid.py         # HHS Parquet → Postgres
 │   └── load_nppes.py            # NPPES CSV → Postgres
@@ -47,7 +47,7 @@ The HHS Medicaid Provider Spending dataset has important scope limitations:
 │   └── lineage.png              # dbt lineage graph
 ├── requirements.txt
 └── README.md
-
+```
 ## Tech stack
 
 - **Database:** PostgreSQL 16 (local)
