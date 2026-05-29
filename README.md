@@ -22,6 +22,8 @@ The HHS Medicaid Provider Spending dataset has important scope limitations:
 
 ## Findings
 
+- **The total paid amount nationally YOY for Medicaid outpatient and professional spend decreased ~6.8% from 2023-24. This is the first time there was a decrease in spend over the last 5 years.**
+- **CA, NY and TX had the highest total paid amount in 2024. AK, MO, NH had the highest cost per beneficiary in 2024.**
 - **In 2024; the states of NY and CA had 5 out of 10 highest paid NPIs accross the dataset**
 - **In the state of GA for 2024, Scottish Rite Children's Hospital ranked first in total paid amount at $72M, and has ranked in the top 2 organizations by total paid since 2018** 
 
