@@ -43,8 +43,6 @@ medicaid-analytics/
 │   └── macros/
 │       └── generate_schema_name.sql
 ├── dashboard/                   # Streamlit app
-├── docs/
-│   └── lineage.png              # dbt lineage graph
 ├── requirements.txt
 └── README.md
 ```
